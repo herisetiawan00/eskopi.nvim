@@ -61,8 +61,8 @@ end
 -- For visual or block selection
 function M.copy_visual()
   local mode = vim.fn.visualmode()
-  vim.cmd([[normal! `<]])
-  vim.cmd([[normal! `>]])
+  -- vim.cmd([[normal! `<]])
+  -- vim.cmd([[normal! `>]])
   M.copy_range(mode)
 end
 
