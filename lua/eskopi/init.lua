@@ -2,82 +2,79 @@ local M = {}
 local base_dir = vim.fn.stdpath("cache") .. "/eskopi"
 local cache_file = base_dir .. "/clipboard.txt"
 
-local function ensure_dir()
-  if vim.fn.isdirectory(base_dir) == 0 then
-    vim.fn.mkdir(base_dir, "p")
-  end
+local function get_visual_selection()
+	-- Save the current register content and selection type
+	local old_reg = vim.fn.getreg('"')
+	local old_regtype = vim.fn.getregtype('"')
+
+	-- Yank the visual selection to the " register (default)
+	vim.cmd('normal! ""y')
+
+	-- Get the yanked text
+	local selection = vim.fn.getreg('"')
+
+	-- Restore the original register content and type
+	vim.fn.setreg('"', old_reg, old_regtype)
+
+	return selection
 end
 
--- Copy range based on marks and selection type
-function M.copy_range(type)
-  ensure_dir()
+local function get_motion_selection()
+	local start_pos = vim.fn.getpos("'<")
+	local end_pos = vim.fn.getpos("'>")
 
-  local start_pos = vim.fn.getpos("'<")
-  local end_pos = vim.fn.getpos("'>")
-  local lines = vim.fn.getline(start_pos[2], end_pos[2])
+	local lines = vim.fn.getline(start_pos[2], end_pos[2])
+	if #lines == 0 then return '' end
 
-  if #lines == 0 then
-    print("eskopi: nothing selected")
-    return
-  end
+	lines[#lines] = string.sub(lines[#lines], 1, end_pos[3])
+	lines[1] = string.sub(lines[1], start_pos[3])
 
-  if type == "v" then -- characterwise
-    lines[1] = string.sub(lines[1], start_pos[3])
-    lines[#lines] = string.sub(lines[#lines], 1, end_pos[3])
-  elseif type == "V" then -- linewise
-    -- keep full lines as-is
-  elseif type == "\22" then -- blockwise visual (ctrl-v)
-    local block = {}
-    for i = 1, #lines do
-      block[i] = string.sub(lines[i], start_pos[3], end_pos[3])
-    end
-    lines = block
-  else
-    print("eskopi: unknown selection type: " .. vim.inspect(type))
-    return
-  end
+	local selection = table.concat(lines, '\n')
 
-  local file = io.open(cache_file, "w")
-  if file then
-    file:write(table.concat(lines, "\n"))
-    file:close()
-    print("eskopi: copied!")
-  else
-    print("eskopi: failed to open clipboard file")
-  end
+	return selection
 end
 
--- Operator function
-function M.operator_copy(type)
-  M.copy_range(type)
+local function write(text)
+	if vim.fn.isdirectory(base_dir) == 0 then
+		vim.fn.mkdir(base_dir, "p")
+	end
+
+	local file = io.open(cache_file, "w")
+	if file then
+		file:write(text)
+		file:close()
+		print("eskopi: Copied to clipboard!")
+	else
+		print("eskopi: Failed to open clipboard")
+	end
 end
 
--- Start operator-pending mode
+function M.copy_motion()
+	local text = get_motion_selection()
+	write(text)
+end
+
 function M.copy_operator()
-  vim.o.operatorfunc = "v:lua.require'eskopi'.operator_copy"
-  vim.api.nvim_feedkeys("g@", "n", false)
+	vim.o.operatorfunc = "v:lua.require'eskopi'.copy_motion"
+	vim.api.nvim_feedkeys("g@", "n", false)
 end
 
--- For visual or block selection
 function M.copy_visual()
-  local mode = vim.fn.visualmode()
-  -- vim.cmd([[normal! `<]])
-  -- vim.cmd([[normal! `>]])
-  M.copy_range(mode)
+	local text = get_visual_selection()
+	write(text)
 end
 
--- Paste from cache
 function M.paste()
-  local file = io.open(cache_file, "r")
-  if not file then
-    print("eskopi: clipboard is empty")
-    return
-  end
-  local content = file:read("*a")
-  file:close()
-  local lines = vim.split(content, "\n", { plain = true })
-  vim.api.nvim_put(lines, "l", true, true)
+	local file = io.open(cache_file, "r")
+	if not file then
+		print("eskopi: Clipboard is empty")
+		return
+	end
+
+	local content = file:read("*a")
+	file:close()
+	local lines = vim.split(content, "\n", { plain = true })
+	vim.api.nvim_put(lines, "l", true, true)
 end
 
 return M
-
