@@ -1,5 +1,5 @@
 local M = {}
-local cache_file = vim.fn.stdpath("cache") .. "/eskopi.txt"
+local cache_file = vim.fn.stdpath("cache") .. "/eskopi/clipboard.txt"
 
 -- Write visual selection to the cache file
 function M.copy()
