@@ -1,41 +1,48 @@
 local M = {}
-local cache_file = vim.fn.stdpath("cache") .. "/eskopi/clipboard.txt"
+local base_dir = vim.fn.stdpath("cache") .. "/eskopi"
+local cache_file = base_dir .. "/clipboard.txt"
 
--- Write visual selection to the cache file
+local function ensure_dir()
+	if vim.fn.isdirectory(base_dir) == 0 then
+		vim.fn.mkdir(base_dir, "p")
+	end
+end
+
 function M.copy()
-  local start_pos = vim.fn.getpos("'<")
-  local end_pos = vim.fn.getpos("'>")
+	ensure_dir();
 
-  local lines = vim.fn.getline(start_pos[2], end_pos[2])
+	local start_pos = vim.fn.getpos("'<")
+	local end_pos = vim.fn.getpos("'>")
 
-  -- Trim the first and last lines based on columns
-  lines[1] = string.sub(lines[1], start_pos[3])
-  lines[#lines] = string.sub(lines[#lines], 1, end_pos[3])
+	local lines = vim.fn.getline(start_pos[2], end_pos[2])
 
-  local file = io.open(cache_file, "w")
-  if file then
-    file:write(table.concat(lines, "\n"))
-    file:close()
-    print("Copied to shared clipboard")
-  else
-    print("Failed to open cache file")
-  end
+	-- Trim the first and last lines based on columns
+	lines[1] = string.sub(lines[1], start_pos[3])
+	lines[#lines] = string.sub(lines[#lines], 1, end_pos[3])
+
+	local file = io.open(cache_file, "w")
+	if file then
+		file:write(table.concat(lines, "\n"))
+		file:close()
+		print("Copied to shared clipboard")
+	else
+		print("Failed to open cache file")
+	end
 end
 
 -- Paste content from the cache file at cursor position
 function M.paste()
-  local file = io.open(cache_file, "r")
-  if not file then
-    print("Nothing in clipboard")
-    return
-  end
+	local file = io.open(cache_file, "r")
+	if not file then
+		print("Nothing in clipboard")
+		return
+	end
 
-  local content = file:read("*a")
-  file:close()
+	local content = file:read("*a")
+	file:close()
 
-  local lines = vim.split(content, "\n", { plain = true })
-  vim.api.nvim_put(lines, "l", true, true)
+	local lines = vim.split(content, "\n", { plain = true })
+	vim.api.nvim_put(lines, "l", true, true)
 end
 
 return M
-
