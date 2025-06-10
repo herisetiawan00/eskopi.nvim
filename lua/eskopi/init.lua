@@ -3,35 +3,35 @@ local base_dir = vim.fn.stdpath("cache") .. "/eskopi"
 local cache_file = base_dir .. "/clipboard.txt"
 
 local function get_visual_selection()
-	-- Save the current register content and selection type
 	local old_reg = vim.fn.getreg('"')
 	local old_regtype = vim.fn.getregtype('"')
 
-	-- Yank the visual selection to the " register (default)
 	vim.cmd('normal! ""y')
 
-	-- Get the yanked text
 	local selection = vim.fn.getreg('"')
 
-	-- Restore the original register content and type
 	vim.fn.setreg('"', old_reg, old_regtype)
 
 	return selection
 end
 
 local function get_motion_selection()
-	local start_pos = vim.fn.getpos("'<")
-	local end_pos = vim.fn.getpos("'>")
+	local buf = 0
+	local start_pos = vim.api.nvim_buf_get_mark(buf, "[")
+	local end_pos = vim.api.nvim_buf_get_mark(buf, "]")
 
-	local lines = vim.fn.getline(start_pos[2], end_pos[2])
-	if #lines == 0 then return '' end
+	if not start_pos or not end_pos then
+		vim.notify("[eskopi] Could not get motion range", vim.log.levels.WARN)
+		return ""
+	end
 
-	lines[#lines] = string.sub(lines[#lines], 1, end_pos[3])
-	lines[1] = string.sub(lines[1], start_pos[3])
+	local lines = vim.api.nvim_buf_get_text(buf,
+		start_pos[1] - 1, start_pos[2],
+		end_pos[1] - 1, end_pos[2] + 1,
+		{}
+	)
 
-	local selection = table.concat(lines, '\n')
-
-	return selection
+	return table.concat(lines, "\n")
 end
 
 local function write(text)
@@ -64,7 +64,7 @@ function M.copy_visual()
 	write(text)
 end
 
-function M.paste()
+local function paste(reversed)
 	local file = io.open(cache_file, "r")
 	if not file then
 		print("eskopi: Clipboard is empty")
@@ -74,7 +74,17 @@ function M.paste()
 	local content = file:read("*a")
 	file:close()
 	local lines = vim.split(content, "\n", { plain = true })
-	vim.api.nvim_put(lines, "l", true, true)
+
+	vim.api.nvim_put(lines, "l", not reversed, true)
+	vim.api.nvim_feedkeys("`]$", "n", false)
+end
+
+function M.paste_before()
+	paste(true)
+end
+
+function M.paste_after()
+	paste(false)
 end
 
 return M
